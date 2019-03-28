@@ -1,0 +1,13 @@
+body {
+    width: 80%;
+    margin: 10vh auto;
+    font-family: sans-serif;
+  }
+  
+table {
+    width: 100%;
+}
+  
+td {
+    text-align: right;
+}

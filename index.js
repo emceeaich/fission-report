@@ -14,6 +14,9 @@ const parse = require('csv-parse');
 const stringify = require('csv-stringify');
 const fs = require('fs');
 const asTable = require('as-table').configure ({ right: true });
+const tableify = require('tableify');
+const express = require('express');
+const app = express();
 
 const max = 10000; // max records we can read from Bugzilla
 
@@ -28,13 +31,19 @@ var data = [];
 
 // create data structure to hold results
 var report = {
-    milestones: {},
-    components: {},
-    statuses: {}
+    milestone: {},
+    component: {},
+    status: {}
 };
+
+// string for temp results
+var s;
 
 // current date
 var now = moment.utc();
+
+// create string to hold report
+var result = now.toISOString(true);
 
 function get_parser() {
     return parse({
@@ -45,28 +54,28 @@ function get_parser() {
         let record;
         while (record = parser.read()) {
             let milestone = record['Fission Milestone'];
-            let component = record.Product + '::' + record.Component;
+            let component = record.Product; // record.Product + '::' + record.Component;
             let status = record.Status;
 
             data.push(record);
             count++;
 
-            if (report.milestones[milestone]) {
-                report.milestones[milestone] ++;
+            if (report.milestone[milestone]) {
+                report.milestone[milestone] ++;
             } else {
-                report.milestones[milestone] = 1;
+                report.milestone[milestone] = 1;
             }
 
-            if (report.components[component]) {
-                report.components[component] ++;
+            if (report.component[component]) {
+                report.component[component] ++;
             } else {
-                report.components[component] = 1;
+                report.component[component] = 1;
             }
 
-            if (report.statuses[status]) {
-                report.statuses[status] ++;
+            if (report.status[status]) {
+                report.status[status] ++;
             } else {
-                report.statuses[status] = 1;
+                report.status[status] = 1;
             }
 
             if(record["Bug ID"] > last) {
@@ -87,35 +96,37 @@ function get_parser() {
             console.log('read last batch');
 
             // table of milestones
-            var milestones = Object.keys(report.milestones).map(milestone => {
+
+            /*
+            chartdata.milestones = Object.keys(report.milestones).map(milestone => {
                 return {
                     'Milestone': milestone,
                     'Count': report.milestones[milestone]
                 };
             }).sort((a, b) => { return (b.Count - a.Count); });
-            console.log(asTable(milestones), '\n\n');
 
             // table of components
-            var components = Object.keys(report.components).map(component => {
+            chartdata.components = Object.keys(report.components).map(component => {
                 return {
                     'Component': component,
                     'Count': report.components[component]
                 };
             }).sort((a, b) => { return (b.Count - a.Count); });
-            console.log(asTable(components), '\n\n');
 
             // table of statuses
-            var statuses = Object.keys(report.statuses).map(status => {
+            chartdata.statuses = Object.keys(report.statuses).map(status => {
                 return {
                     'Status': status,
                     'Count': report.statuses[status]
                 };
             }).sort((a, b) => { return (b.Count - a.Count); });
-            console.log(asTable(statuses), '\n\n');
+            */
 
             // group bugs by milestone
-            Object.keys(report.milestones).forEach(milestone => {
-                console.log(milestone, 'Breakdown');
+            Object.keys(report.milestone).forEach(milestone => {
+
+                result = result + `<p><strong>Milestone ${milestone}</p><strong>`;
+
                 let section = data.filter(record => {return (record['Fission Milestone'] === milestone); })
                 .map(record => {
                     return {
@@ -123,12 +134,15 @@ function get_parser() {
                         'Summary': record.Summary,
                         'Resolution': record.Resolution,
                         'Assignee': record.Assignee,
-                        'Bug ID': record['Bug ID'],
+                        'Bug ID': `<a href="https://bugzilla.mozilla.org/bug/${record['Bug ID']}">${record['Bug ID']}</a>`,
                         'Milestone': record['Fission Milestone']
                     };
                 });
-                console.log(asTable(section), '\n\n');
+                s = tableify(section);
+                result = result + s;
             });
+
+            console.log('done');
 
         } else {
             start_stream(last);
@@ -145,40 +159,29 @@ function start_stream(last) {
     bug_stream = got.stream(URL).pipe(parser);
 }
 
-function write_report(data) {
-    fs.exists('./out', (exists) => {
-        if (!exists) {
-            fs.mkdir('./out', (err) => {
-                if (err) {
-                    console.error(err);
-                } else {
-                    write_report(data);
-                }
-            });
-        } else {
-            var file = fs.openSync('./out/report.csv', 'w');
-            stringify(data, {
-                header: true
-            }, (err, output) => {
-                if (err) {
-                    console.error(err);
-                } else {
-                    fs.writeFile(file, output, (err) => {
-                        if (err) {
-                            console.error(err);
-                        } else {
-                            console.log('saved data in ./out/report.csv');
-                        }
-                    });
-                }
-            });
-
-
-        }
-    });
-}
-
-
 var bug_stream, parser;
 
 start_stream(last);
+
+// express handlers
+
+app.use(express.static('./public'));
+app.set('views', './views');
+app.set('view engine', 'pug');
+
+app.get('/', (request, response) => {
+    if (done) {
+        response.render('index', {title: 'Project Report', result: result});
+    }
+    else {
+        response.sendFile(__dirname + '/views/wait.html');
+    }
+});
+
+app.get('/data', (request, response) => {
+    response.send(report);
+});
+
+var listener = app.listen(8080, () => {
+    console.log('Your application is listening for requests on port', listener.address().port);
+});

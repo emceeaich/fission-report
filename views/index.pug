@@ -1,0 +1,13 @@
+html
+    head
+        title= title
+        style
+            include ../public/stylesheets/style.css
+    body
+        h1= title
+        div.graphs
+        div.tables !{result}
+        script(src='https://cdn.jsdelivr.net/npm/chart.js@2.8.0/dist/Chart.bundle.min.js')
+        script(src='https://cdn.jsdelivr.net/gh/emn178/chartjs-plugin-labels/src/chartjs-plugin-labels.js')
+        script
+            include ../public/scripts/index.js
