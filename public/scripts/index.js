@@ -50,7 +50,7 @@ function doughnut(parent, canvasId, data) {
 
     console.log(data);
 
-    new Chart(ctx, {
+    let chart = new Chart(ctx, {
        type: "doughnut",
        data: {
          datasets: [{
@@ -75,6 +75,7 @@ function doughnut(parent, canvasId, data) {
              },
            }
          },
+         responsive: true,
          plugins: {
            labels: {
              render: "value",
