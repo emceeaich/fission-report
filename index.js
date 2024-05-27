@@ -1,6 +1,4 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+#! /usr/local/bin/node
 
 'use strict';
 /*
@@ -15,6 +13,7 @@ const moment = require('moment');
 const parse = require('csv-parse');
 const stringify = require('csv-stringify');
 const fs = require('fs');
+const asTable = require('as-table').configure ({ right: true });
 const tableify = require('tableify');
 const express = require('express');
 const app = express();
@@ -33,7 +32,7 @@ var data = [];
 // create data structure to hold results
 var report = {
     milestone: {},
-    product: {},
+    component: {},
     status: {}
 };
 
@@ -55,7 +54,7 @@ function get_parser() {
         let record;
         while (record = parser.read()) {
             let milestone = record['Fission Milestone'];
-            let product = record.Product; 
+            let component = record.Product; // record.Product + '::' + record.Component;
             let status = record.Status;
 
             data.push(record);
@@ -67,10 +66,10 @@ function get_parser() {
                 report.milestone[milestone] = 1;
             }
 
-            if (report.product[product]) {
-                report.product[product] ++;
+            if (report.component[component]) {
+                report.component[component] ++;
             } else {
-                report.product[product] = 1;
+                report.component[component] = 1;
             }
 
             if (report.status[status]) {
@@ -95,6 +94,33 @@ function get_parser() {
         if (count < max) {
             done = true;
             console.log('read last batch');
+
+            // table of milestones
+
+            /*
+            chartdata.milestones = Object.keys(report.milestones).map(milestone => {
+                return {
+                    'Milestone': milestone,
+                    'Count': report.milestones[milestone]
+                };
+            }).sort((a, b) => { return (b.Count - a.Count); });
+
+            // table of components
+            chartdata.components = Object.keys(report.components).map(component => {
+                return {
+                    'Component': component,
+                    'Count': report.components[component]
+                };
+            }).sort((a, b) => { return (b.Count - a.Count); });
+
+            // table of statuses
+            chartdata.statuses = Object.keys(report.statuses).map(status => {
+                return {
+                    'Status': status,
+                    'Count': report.statuses[status]
+                };
+            }).sort((a, b) => { return (b.Count - a.Count); });
+            */
 
             // group bugs by milestone
             Object.keys(report.milestone).forEach(milestone => {
@@ -137,8 +163,6 @@ var bug_stream, parser;
 
 start_stream(last);
 
-var timeout = setInterval(start_stream, 60*5*1000, 0); // update every five minutes
-
 // express handlers
 
 app.use(express.static('./public'));
@@ -158,6 +182,6 @@ app.get('/data', (request, response) => {
     response.send(report);
 });
 
-var listener = app.listen(process.env.PORT, () => {
+var listener = app.listen(8080, () => {
     console.log('Your application is listening for requests on port', listener.address().port);
 });
